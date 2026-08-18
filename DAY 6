@@ -1,0 +1,592 @@
+pip install transformers datasets torch accelerate scikit-learn
+# ==========================================
+# BERT Sentiment Analysis using Hugging Face
+# ==========================================
+
+import numpy as np
+import torch
+
+from datasets import load_dataset
+from transformers import (
+    BertTokenizer,
+    BertForSequenceClassification,
+    Trainer,
+    TrainingArguments,
+    pipeline
+)
+
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+
+# ==========================================
+# Check GPU
+# ==========================================
+
+print("=" * 50)
+print("PyTorch Version:", torch.__version__)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+print("Using Device:", device)
+
+if device == "cuda":
+    print("GPU:", torch.cuda.get_device_name(0))
+
+print("=" * 50)
+
+# ==========================================
+# Load Dataset
+# ==========================================
+
+print("\nLoading IMDb Dataset...")
+
+dataset = load_dataset("imdb")
+
+print(dataset)
+
+# ==========================================
+# Reduce Dataset (for quick training)
+# ==========================================
+
+train_dataset = dataset["train"].shuffle(seed=42).select(range(5000))
+test_dataset = dataset["test"].shuffle(seed=42).select(range(1000))
+
+# ==========================================
+# Load Tokenizer
+# ==========================================
+
+print("\nLoading BERT Tokenizer...")
+
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
+# ==========================================
+# Tokenization Function
+# ==========================================
+
+def tokenize_function(example):
+    return tokenizer(
+        example["text"],
+        padding="max_length",
+        truncation=True,
+        max_length=128
+    )
+
+print("\nTokenizing Dataset...")
+
+train_dataset = train_dataset.map(tokenize_function, batched=True)
+test_dataset = test_dataset.map(tokenize_function, batched=True)
+
+# ==========================================
+# Format Dataset
+# ==========================================
+
+train_dataset.set_format(
+    type="torch",
+    columns=["input_ids", "attention_mask", "label"]
+)
+
+test_dataset.set_format(
+    type="torch",
+    columns=["input_ids", "attention_mask", "label"]
+)
+
+# ==========================================
+# Load BERT Model
+# ==========================================
+
+print("\nLoading Pretrained BERT Model...")
+
+model = BertForSequenceClassification.from_pretrained(
+    "bert-base-uncased",
+    num_labels=2
+)
+
+# ==========================================
+# Evaluation Metrics
+# ==========================================
+
+def compute_metrics(eval_pred):
+
+    predictions, labels = eval_pred
+
+    predictions = np.argmax(predictions, axis=1)
+
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        labels,
+        predictions,
+        average="binary"
+    )
+
+    accuracy = accuracy_score(labels, predictions)
+
+    return {
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1
+    }
+
+# ==========================================
+# Training Arguments
+# ==========================================
+
+training_args = TrainingArguments(
+
+    output_dir="./bert_results",
+
+    eval_strategy="epoch",
+
+    save_strategy="epoch",
+
+    learning_rate=2e-5,
+
+    per_device_train_batch_size=8,
+
+    per_device_eval_batch_size=8,
+
+    num_train_epochs=2,
+
+    weight_decay=0.01,
+
+    logging_steps=100,
+
+    load_best_model_at_end=True,
+
+    report_to="none"
+)
+
+# ==========================================
+# Trainer
+# ==========================================
+
+trainer = Trainer(
+
+    model=model,
+
+    args=training_args,
+
+    train_dataset=train_dataset,
+
+    eval_dataset=test_dataset,
+
+    compute_metrics=compute_metrics
+)
+
+# ==========================================
+# Train Model
+# ==========================================
+
+print("\nStarting Training...\n")
+
+trainer.train()
+
+# ==========================================
+# Evaluate
+# ==========================================
+
+print("\nEvaluating Model...\n")
+
+results = trainer.evaluate()
+
+print(results)
+
+# ==========================================
+# Save Model
+# ==========================================
+
+print("\nSaving Model...\n")
+
+trainer.save_model("bert_sentiment_model")
+
+tokenizer.save_pretrained("bert_sentiment_model")
+
+print("Model Saved Successfully")
+
+# ==========================================
+# Load Saved Model
+# ==========================================
+
+classifier = pipeline(
+
+    "sentiment-analysis",
+
+    model="bert_sentiment_model",
+
+    tokenizer="bert_sentiment_model",
+
+    device=0 if torch.cuda.is_available() else -1
+)
+
+# ==========================================
+# Test Custom Sentences
+# ==========================================
+
+texts = [
+
+    "This movie is fantastic. I loved it.",
+
+    "Worst movie ever made.",
+
+    "The acting was average.",
+
+    "Excellent direction and amazing screenplay.",
+
+    "I will never watch this again."
+]
+
+print("\nPredictions\n")
+
+for sentence in texts:
+
+    prediction = classifier(sentence)[0]
+
+    print("-" * 60)
+
+    print("Sentence :", sentence)
+
+    print("Prediction :", prediction["label"])
+
+    print("Confidence :", round(prediction["score"] * 100, 2), "%")
+
+print("-" * 60)
+
+print("\nCompleted Successfully")pip install torch transformers datasets
+import math
+import pandas as pd
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from transformers import GPT2Tokenizer
+
+CSV_PATH = "IMDB Dataset.csv"
+MAX_LEN = 128
+BATCH_SIZE = 8
+EPOCHS = 5
+LR = 3e-4
+EMBED_DIM = 256
+HEADS = 8
+LAYERS = 4
+FF_DIM = 1024
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using:", device)
+
+df = pd.read_csv(CSV_PATH)
+texts = df["review"].astype(str).tolist()
+
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+tokenizer.pad_token = tokenizer.eos_token
+
+enc = tokenizer(
+    texts,
+    truncation=True,
+    padding="max_length",
+    max_length=MAX_LEN,
+    return_tensors="pt"
+)
+
+class IMDBDataset(Dataset):
+    def __init__(self, ids):
+        self.ids = ids
+    def __len__(self):
+        return len(self.ids)
+    def __getitem__(self, idx):
+        x = self.ids[idx]
+        return x, x.clone()
+
+dataset = IMDBDataset(enc["input_ids"])
+loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(self, d_model, heads):
+        super().__init__()
+        self.heads = heads
+        self.dk = d_model // heads
+        self.q = nn.Linear(d_model, d_model)
+        self.k = nn.Linear(d_model, d_model)
+        self.v = nn.Linear(d_model, d_model)
+        self.o = nn.Linear(d_model, d_model)
+
+    def forward(self, x):
+        B,T,C = x.shape
+        q = self.q(x).view(B,T,self.heads,self.dk).transpose(1,2)
+        k = self.k(x).view(B,T,self.heads,self.dk).transpose(1,2)
+        v = self.v(x).view(B,T,self.heads,self.dk).transpose(1,2)
+
+        scores = (q @ k.transpose(-2,-1)) / math.sqrt(self.dk)
+        mask = torch.triu(torch.ones(T,T,device=x.device), diagonal=1).bool()
+        scores = scores.masked_fill(mask, -1e9)
+        attn = torch.softmax(scores, dim=-1)
+        out = attn @ v
+        out = out.transpose(1,2).contiguous().view(B,T,C)
+        return self.o(out)
+
+class FeedForward(nn.Module):
+    def __init__(self,d_model,ff):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(d_model,ff),
+            nn.GELU(),
+            nn.Linear(ff,d_model)
+        )
+    def forward(self,x):
+        return self.net(x)
+
+class Block(nn.Module):
+    def __init__(self,d_model,heads,ff):
+        super().__init__()
+        self.ln1=nn.LayerNorm(d_model)
+        self.attn=MultiHeadSelfAttention(d_model,heads)
+        self.ln2=nn.LayerNorm(d_model)
+        self.ff=FeedForward(d_model,ff)
+    def forward(self,x):
+        x=x+self.attn(self.ln1(x))
+        x=x+self.ff(self.ln2(x))
+        return x
+
+class GPT(nn.Module):
+    def __init__(self,vocab,max_len,d_model,heads,layers,ff):
+        super().__init__()
+        self.tok=nn.Embedding(vocab,d_model)
+        self.pos=nn.Embedding(max_len,d_model)
+        self.blocks=nn.Sequential(*[
+            Block(d_model,heads,ff) for _ in range(layers)
+        ])
+        self.ln=nn.LayerNorm(d_model)
+        self.fc=nn.Linear(d_model,vocab)
+
+    def forward(self,ids):
+        B,T=ids.shape
+        pos=torch.arange(T,device=ids.device).unsqueeze(0)
+        x=self.tok(ids)+self.pos(pos)
+        x=self.blocks(x)
+        x=self.ln(x)
+        return self.fc(x)
+
+model = GPT(
+    tokenizer.vocab_size,
+    MAX_LEN,
+    EMBED_DIM,
+    HEADS,
+    LAYERS,
+    FF_DIM
+).to(device)
+
+criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
+optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
+
+print("Training...")
+
+for epoch in range(EPOCHS):
+    model.train()
+    total = 0.0
+    for ids, labels in loader:
+        ids = ids.to(device)
+        labels = labels.to(device)
+
+        logits = model(ids)
+        loss = criterion(
+            logits.view(-1, tokenizer.vocab_size),
+            labels.view(-1)
+        )
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        total += loss.item()
+
+    print(f"Epoch {epoch+1}: {total/len(loader):.4f}")
+
+torch.save(model.state_dict(), "gpt_imdb.pth")
+print("Model saved as gpt_imdb.pth")
+
+def generate(prompt, max_new_tokens=40):
+    model.eval()
+    ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            ids = ids[:, -MAX_LEN:]
+            logits = model(ids)
+            next_token = torch.argmax(logits[:, -1, :], dim=-1).unsqueeze(0)
+            ids = torch.cat([ids, next_token], dim=1)
+
+    return tokenizer.decode(ids[0], skip_special_tokens=True)
+
+while True:
+    text = input("\nEnter prompt (exit to quit): ")
+    if text.lower() == "exit":
+        break
+    print(generate(text))
+import math
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
+from datasets import load_dataset
+from transformers import GPT2Tokenizer
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using:", device)
+
+# -----------------------------
+# Dataset
+# -----------------------------
+dataset = load_dataset("stanfordnlp/imdb")
+texts = dataset["train"]["text"][:5000]
+
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+tokenizer.pad_token = tokenizer.eos_token
+
+MAX_LEN = 128
+
+enc = tokenizer(
+    texts,
+    truncation=True,
+    padding="max_length",
+    max_length=MAX_LEN,
+    return_tensors="pt"
+)
+
+class GPTDataset(Dataset):
+    def __init__(self, ids):
+        self.ids = ids
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __getitem__(self, idx):
+        x = self.ids[idx]
+        return {
+            "input_ids": x[:-1],
+            "labels": x[1:]
+        }
+
+train_loader = DataLoader(
+    GPTDataset(enc["input_ids"]),
+    batch_size=8,
+    shuffle=True
+)
+
+# -----------------------------
+# GPT Model
+# -----------------------------
+class GPTModel(nn.Module):
+    def __init__(self, vocab_size, d_model=256, nhead=8,
+                 layers=6, max_len=128, dropout=0.1):
+        super().__init__()
+
+        self.token_embed = nn.Embedding(vocab_size, d_model)
+        self.pos_embed = nn.Embedding(max_len, d_model)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=d_model*4,
+            dropout=dropout,
+            batch_first=True,
+            activation="gelu"
+        )
+
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=layers
+        )
+
+        self.ln = nn.LayerNorm(d_model)
+        self.fc = nn.Linear(d_model, vocab_size)
+
+    def forward(self, ids):
+        B, T = ids.shape
+
+        pos = torch.arange(T, device=ids.device).unsqueeze(0)
+
+        x = self.token_embed(ids) + self.pos_embed(pos)
+
+        mask = torch.triu(
+            torch.ones(T, T, device=ids.device),
+            diagonal=1
+        ).bool()
+
+        x = self.transformer(
+            x,
+            mask=mask
+        )
+
+        x = self.ln(x)
+
+        return self.fc(x)
+
+model = GPTModel(tokenizer.vocab_size, max_len=MAX_LEN).to(device)
+
+criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
+
+EPOCHS = 5
+
+print("Training...")
+
+for epoch in range(EPOCHS):
+    model.train()
+    total = 0
+
+    for batch in train_loader:
+        ids = batch["input_ids"].to(device)
+        labels = batch["labels"].to(device)
+
+        optimizer.zero_grad()
+
+        logits = model(ids)
+
+        loss = criterion(
+            logits.reshape(-1, tokenizer.vocab_size),
+            labels.reshape(-1)
+        )
+
+        loss.backward()
+        optimizer.step()
+
+        total += loss.item()
+
+    print(f"Epoch {epoch+1}: {total/len(train_loader):.4f}")
+
+torch.save(model.state_dict(), "mini_gpt_imdb.pth")
+print("Model saved.")
+
+# -----------------------------
+# Generation
+# -----------------------------
+model.eval()
+
+def generate(prompt, max_new_tokens=40, temperature=0.8, top_k=40):
+    ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+
+            if ids.size(1) >= MAX_LEN-1:
+                break
+
+            logits = model(ids)
+            logits = logits[:, -1, :] / temperature
+
+            values, indices = torch.topk(logits, top_k)
+
+            probs = torch.softmax(values, dim=-1)
+
+            next_id = indices.gather(
+                -1,
+                torch.multinomial(probs, 1)
+            )
+
+            ids = torch.cat([ids, next_id], dim=1)
+
+    return tokenizer.decode(ids[0], skip_special_tokens=True)
+
+while True:
+    text = input("\nPrompt: ")
+
+    if text.lower() == "exit":
+        break
+
+    print("\nGenerated:\n")
+    print(generate(text))
