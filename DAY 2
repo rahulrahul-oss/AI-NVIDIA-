@@ -1,0 +1,485 @@
+
+Import relevant libraries
+import numpy as np
+import pandas as pd
+Load dataset
+marketing_data = pd.read_csv("marketing_campaign.csv")
+Subset for relevant columns
+marketing_data = marketing_data[['ID', 'Year_Birth', 'Education', 'Marital_Status',
+                'Income', 'Kidhome', 'Teenhome', 'Dt_Customer',
+                'Recency','NumStorePurchases', 'NumWebVisitsMonth']]
+Inspect first 2 rows and data types of the dataset
+marketing_data.head(2).T
+0	1
+ID	5524	2174
+Year_Birth	1957	1954
+Education	Graduation	Graduation
+Marital_Status	Single	Single
+Income	58138.0	46344.0
+Kidhome	0	1
+Teenhome	0	1
+Dt_Customer	04-09-2012	08-03-2014
+Recency	58	38
+NumStorePurchases	4	2
+NumWebVisitsMonth	7	5
+marketing_data.dtypes
+0
+ID	int64
+Year_Birth	int64
+Education	object
+Marital_Status	object
+Income	float64
+Kidhome	int64
+Teenhome	int64
+Dt_Customer	object
+Recency	int64
+NumStorePurchases	int64
+NumWebVisitsMonth	int64
+
+dtype: object
+marketing_data.shape
+(2240, 11)
+Check the average number of store purchases of customers based on number of kids in the home
+marketing_data.groupby('Kidhome')['NumStorePurchases'].mean()
+NumStorePurchases
+Kidhome	
+0	7.217324
+1	3.863181
+2	3.437500
+
+dtype: float64
+Sort customers based on number of Store Purchases in descending order
+
+sorted_data = marketing_data.sort_values('NumStorePurchases', ascending=False)
+sorted_data[['ID','NumStorePurchases']]
+ID	NumStorePurchases
+2237	7270	13
+1325	9212	13
+499	466	13
+755	3870	13
+470	2021	13
+...	...	...
+1653	4931	0
+981	3955	0
+2132	11181	0
+1524	11110	0
+9	5899	0
+2240 rows × 2 columns
+
+Categorise the number of store purchases into high, moderate and low categories
+
+marketing_data['bins'] = pd.cut(x=marketing_data['NumStorePurchases'], bins=[0,4,8,13],
+                               labels = ['Low', 'Moderate', 'High'])
+marketing_data[['NumStorePurchases','bins']].head()
+NumStorePurchases	bins
+0	4	Low
+1	2	Low
+2	10	High
+3	4	Low
+4	6	Moderate
+marketing_data['bins'] = pd.cut(x=marketing_data['NumStorePurchases'], bins=3
+                               ,labels = ['Low', 'Moderate', 'High'])
+marketing_data[['NumStorePurchases','bins']].head()
+NumStorePurchases	bins
+0	4	Low
+1	2	Low
+2	10	High
+3	4	Low
+4	6	Moderate
+Subset for relevant columns
+
+marketing_data = marketing_data[['Education', 'Marital_Status',
+                'Kidhome', 'Teenhome']]
+Inspect first 5 rows and data types of the dataset
+
+marketing_data.head()
+Education	Marital_Status	Kidhome	Teenhome
+0	Graduation	Single	0	0
+1	Graduation	Single	1	1
+2	Graduation	Together	0	0
+3	Graduation	Together	1	0
+4	PhD	Married	1	0
+Inspect first 5 rows and data types of the dataset
+
+marketing_data.head()
+Education	Marital_Status	Kidhome	Teenhome
+0	Graduation	Single	0	0
+1	Graduation	Single	1	1
+2	Graduation	Together	0	0
+3	Graduation	Together	1	0
+4	PhD	Married	1	0
+marketing_data.shape
+(2240, 4)
+Remove duplicates across the four columns
+
+marketing_data_duplicate = marketing_data.drop_duplicates()
+marketing_data_duplicate
+Education	Marital_Status	Kidhome	Teenhome
+0	Graduation	Single	0	0
+1	Graduation	Single	1	1
+2	Graduation	Together	0	0
+3	Graduation	Together	1	0
+4	PhD	Married	1	0
+...	...	...	...	...
+2134	Master	Absurd	0	0
+2147	Master	Together	1	2
+2177	PhD	YOLO	0	1
+2208	Basic	Together	0	1
+2223	Master	Married	1	2
+135 rows × 4 columns
+
+marketing_data_duplicate.shape
+(135, 4)
+Subset for relevant columns
+
+marketing_data = pd.read_csv("marketing_campaign.csv")
+marketing_data = marketing_data[['ID', 'Year_Birth', 'Education', 'Marital_Status']]
+Take sample from dataset
+
+marketing_data = marketing_data[:5]
+Inspect first 5 rows and shape of the dataset
+
+marketing_data
+ID	Year_Birth	Education	Marital_Status
+0	5524	1957	Graduation	Single
+1	2174	1954	Graduation	Single
+2	4141	1965	Graduation	Together
+3	6182	1984	Graduation	Together
+4	5324	1981	PhD	Married
+marketing_data
+ID	Year_Birth	Education	Marital_Status
+0	5524	1957	Graduation	Single
+1	2174	1954	Graduation	Single
+2	4141	1965	Graduation	Together
+3	6182	1984	Graduation	Together
+4	5324	1981	PhD	Married
+marketing_data.shape
+(5, 4)
+Delete a specified rows at index values 1
+
+marketing_data.drop(labels=[1], axis=0)
+ID	Year_Birth	Education	Marital_Status
+0	5524	1957	Graduation	Single
+2	4141	1965	Graduation	Together
+3	6182	1984	Graduation	Together
+4	5324	1981	PhD	Married
+Delete a single column
+
+marketing_data.drop(labels=['Year_Birth'], axis=1)
+ID	Education	Marital_Status
+0	5524	Graduation	Single
+1	2174	Graduation	Single
+2	4141	Graduation	Together
+3	6182	Graduation	Together
+4	5324	PhD	Married
+marketing_data = pd.read_csv("marketing_campaign.csv")
+marketing_data = marketing_data[['ID', 'Year_Birth','Marital_Status','Income']]
+marketing_data['Income'].isna().sum()
+np.int64(24)
+marketing_data['Income'] = marketing_data['Income'].fillna(0)
+marketing_data['Income'].isna().sum()
+np.int64(0)
+Change the data type of the Income from float to int
+
+marketing_data['Income_changed'] = marketing_data['Income'].astype(int)
+marketing_data[['Income','Income_changed']].head()
+Income	Income_changed
+0	58138.0	58138
+1	46344.0	46344
+2	71613.0	71613
+3	26646.0	26646
+4	58293.0	58293
+marketing_data[['Income','Income_changed']].dtypes
+0
+Income	float64
+Income_changed	int64
+
+dtype: object
+marketing_data = pd.read_csv("marketing_campaign.csv")
+marketing_data = marketing_data[['ID', 'Year_Birth', 'Kidhome', 'Teenhome']]
+Inspect first 5 rows and data types of the dataset
+
+marketing_data.head()
+ID	Year_Birth	Kidhome	Teenhome
+0	5524	1957	0	0
+1	2174	1954	1	1
+2	4141	1965	0	0
+3	6182	1984	1	0
+4	5324	1981	1	0
+marketing_data.shape
+(2240, 4)
+Replace the values in Teenhomes with "has teen" and "has no teen"
+
+marketing_data['Teenhome_replaced'] = marketing_data['Teenhome'].replace([0,1,2],['has no teen','has teen','has teen'])
+marketing_data[['Teenhome','Teenhome_replaced']].head()
+Teenhome	Teenhome_replaced
+0	0	has no teen
+1	1	has teen
+2	0	has no teen
+3	0	has no teen
+4	0	has no teen
+marketing_data = pd.read_csv("marketing_campaign.csv")
+marketing_data = marketing_data[['ID', 'Year_Birth', 'Education','Income']]
+Inspect first 5 rows and data types of the dataset
+
+marketing_data.head()
+ID	Year_Birth	Education	Income
+0	5524	1957	Graduation	58138.0
+1	2174	1954	Graduation	46344.0
+2	4141	1965	Graduation	71613.0
+3	6182	1984	Graduation	26646.0
+4	5324	1981	PhD	58293.0
+marketing_data.shape
+(2240, 4)
+Check for missing values
+
+marketing_data.isnull().sum()
+0
+ID	0
+Year_Birth	0
+Education	0
+Income	24
+
+dtype: int64
+Drop Missing values
+
+marketing_data_withoutna = marketing_data.dropna(how = 'any')
+marketing_data_withoutna.head()
+ID	Year_Birth	Education	Income
+0	5524	1957	Graduation	58138.0
+1	2174	1954	Graduation	46344.0
+2	4141	1965	Graduation	71613.0
+3	6182	1984	Graduation	26646.0
+4	5324	1981	PhD	58293.0
+marketing_data_withoutna.shape
+(2216, 4)
+Appending the data
+
+marketing_sample1 = pd.read_csv("marketing_campaign_append1.csv")
+marketing_sample2 = pd.read_csv("marketing_campaign_append2.csv")
+Subset for relevant columns
+
+marketing_sample1 = marketing_sample1[['ID', 'Year_Birth', 'Education', 'Marital_Status',
+                'Income', 'Kidhome', 'Teenhome', 'Dt_Customer',
+                'Recency','NumStorePurchases', 'NumWebVisitsMonth']]
+marketing_sample2 = marketing_sample2[['ID', 'Year_Birth', 'Education', 'Marital_Status',
+                'Income', 'Kidhome', 'Teenhome', 'Dt_Customer',
+                'Recency','NumStorePurchases', 'NumWebVisitsMonth']]
+Inspect the shape of the datasets and first 5 rows
+
+marketing_sample1.shape
+(500, 11)
+marketing_sample2.shape
+(500, 11)
+marketing_sample1.head()
+ID	Year_Birth	Education	Marital_Status	Income	Kidhome	Teenhome	Dt_Customer	Recency	NumStorePurchases	NumWebVisitsMonth
+0	5524	1957	Graduation	Single	58138.0	0	0	04/09/2012	58	4	7
+1	2174	1954	Graduation	Single	46344.0	1	1	08/03/2014	38	2	5
+2	4141	1965	Graduation	Together	71613.0	0	0	21/08/2013	26	10	4
+3	6182	1984	Graduation	Together	26646.0	1	0	10/02/2014	26	4	6
+4	5324	1981	PhD	Married	58293.0	1	0	19/01/2014	94	6	5
+marketing_sample2.head()
+Append the two datasets into one new dataset
+
+appended_data = pd.concat([marketing_sample1, marketing_sample2])
+appended_data.shape
+(1000, 11)
+appended_data.head()
+ID	Year_Birth	Education	Marital_Status	Income	Kidhome	Teenhome	Dt_Customer	Recency	NumStorePurchases	NumWebVisitsMonth
+0	5524	1957	Graduation	Single	58138.0	0	0	04/09/2012	58	4	7
+1	2174	1954	Graduation	Single	46344.0	1	1	08/03/2014	38	2	5
+2	4141	1965	Graduation	Together	71613.0	0	0	21/08/2013	26	10	4
+3	6182	1984	Graduation	Together	26646.0	1	0	10/02/2014	26	4	6
+4	5324	1981	PhD	Married	58293.0	1	0	19/01/2014	94	6	5
+marketing_sample1 = pd.read_csv("marketing_campaign_concat1.csv")
+marketing_sample2 = pd.read_csv("marketing_campaign_concat2.csv")
+marketing_sample1.shape
+(2240, 5)
+marketing_sample1.head()
+ID	Year_Birth	Education	Marital_Status	Income
+0	5524	1957	Graduation	Single	58138.0
+1	2174	1954	Graduation	Single	46344.0
+2	4141	1965	Graduation	Together	71613.0
+3	6182	1984	Graduation	Together	26646.0
+4	5324	1981	PhD	Married	58293.0
+marketing_sample2.shape
+(2240, 5)
+marketing_sample2.head()
+NumDealsPurchases	NumWebPurchases	NumCatalogPurchases	NumStorePurchases	NumWebVisitsMonth
+0	3	8	10	4	7
+1	2	1	1	2	5
+2	1	8	2	10	4
+3	2	2	0	4	6
+4	5	5	3	6	5
+ 
+Concatenate the two datasets into one new dataset
+
+concatenated_data = pd.concat([marketing_sample1, marketing_sample2], axis = 1)
+concatenated_data.shape
+(2240, 10)
+concatenated_data.head()
+ID	Year_Birth	Education	Marital_Status	Income	NumDealsPurchases	NumWebPurchases	NumCatalogPurchases	NumStorePurchases	NumWebVisitsMonth
+0	5524	1957	Graduation	Single	58138.0	3	8	10	4	7
+1	2174	1954	Graduation	Single	46344.0	2	1	1	2	5
+2	4141	1965	Graduation	Together	71613.0	1	8	2	10	4
+3	6182	1984	Graduation	Together	26646.0	2	2	0	4	6
+4	5324	1981	PhD	Married	58293.0	5	5	3	6	5
+marketing_sample1 = pd.read_csv("marketing_campaign_merge1.csv")
+marketing_sample2 = pd.read_csv("marketing_campaign_merge2.csv")
+Inspect the datasets
+marketing_sample1.shape
+(2240, 3)
+marketing_sample1.head()
+ID	Year_Birth	Education
+0	5524	1957	Graduation
+1	2174	1954	Graduation
+2	4141	1965	Graduation
+3	6182	1984	Graduation
+4	5324	1981	PhD
+marketing_sample1.shape
+(2240, 3)
+marketing_sample2.head()
+ID	Marital_Status	Income
+0	5524	Single	58138.0
+1	2174	Single	46344.0
+2	4141	Together	71613.0
+3	6182	Together	26646.0
+4	5324	Married	58293.0
+marketing_sample2.shape
+(2240, 3)
+Merge the two datasets into one new dataset based on the common column (i.e. ID)
+
+merged_data = pd.merge(marketing_sample1,marketing_sample2,on = "ID")
+merged_data.shape
+(2240, 5)
+merged_data.head()
+ID	Year_Birth	Education	Marital_Status	Income
+0	5524	1957	Graduation	Single	58138.0
+1	2174	1954	Graduation	Single	46344.0
+2	4141	1965	Graduation	Together	71613.0
+3	6182	1984	Graduation	Together	26646.0
+4	5324	1981	PhD	Married	58293.0
+
+Import relevant libraries
+import numpy as np
+import pandas as pd
+Load data into dataframe
+covid_data = pd.read_csv("covid-data.csv")
+#
+Inspect the dataframe
+covid_data.head(5)
+iso_code	continent	location	date	total_cases	new_cases	new_cases_smoothed	total_deaths	new_deaths	new_deaths_smoothed	...	female_smokers	male_smokers	handwashing_facilities	hospital_beds_per_thousand	life_expectancy	human_development_index	excess_mortality_cumulative_absolute	excess_mortality_cumulative	excess_mortality	excess_mortality_cumulative_per_million
+0	AFG	Asia	Afghanistan	24/02/2020	5	5	NaN	NaN	NaN	NaN	...	NaN	NaN	37.746	0.5	64.83	0.511	NaN	NaN	NaN	NaN
+1	AFG	Asia	Afghanistan	25/02/2020	5	0	NaN	NaN	NaN	NaN	...	NaN	NaN	37.746	0.5	64.83	0.511	NaN	NaN	NaN	NaN
+2	AFG	Asia	Afghanistan	26/02/2020	5	0	NaN	NaN	NaN	NaN	...	NaN	NaN	37.746	0.5	64.83	0.511	NaN	NaN	NaN	NaN
+3	AFG	Asia	Afghanistan	27/02/2020	5	0	NaN	NaN	NaN	NaN	...	NaN	NaN	37.746	0.5	64.83	0.511	NaN	NaN	NaN	NaN
+4	AFG	Asia	Afghanistan	28/02/2020	5	0	NaN	NaN	NaN	NaN	...	NaN	NaN	37.746	0.5	64.83	0.511	NaN	NaN	NaN	NaN
+5 rows × 67 columns
+
+covid_data = covid_data[['iso_code','continent','location','date','total_cases','new_cases']]
+covid_data.head(5)
+iso_code	continent	location	date	total_cases	new_cases
+0	AFG	Asia	Afghanistan	24/02/2020	5	5
+1	AFG	Asia	Afghanistan	25/02/2020	5	0
+2	AFG	Asia	Afghanistan	26/02/2020	5	0
+3	AFG	Asia	Afghanistan	27/02/2020	5	0
+4	AFG	Asia	Afghanistan	28/02/2020	5	0
+covid_data.dtypes
+0
+iso_code	object
+continent	object
+location	object
+date	object
+total_cases	int64
+new_cases	int64
+
+dtype: object
+covid_data.shape
+(5818, 6)
+Analyse the mean of the new_cases column using the mean method in numpy
+data_mean = np.mean(covid_data["new_cases"])
+data_mean
+np.float64(8814.365761430045)
+Analyse the mean of the new_cases column using the mean method in pandas
+data_mean = covid_data["new_cases"].mean()
+data_mean
+np.float64(8814.365761430045)
+Check the median of the new_cases column using the median method in numpy
+
+data_median = np.median(covid_data["new_cases"])
+data_median
+np.float64(261.0)
+Check the median of the new_cases column using the median method in pandas
+
+data_median = covid_data["new_cases"].median()
+data_median
+261.0
+Identify the mode of the new_cases column using the mode method
+
+from scipy import stats
+data_mode = covid_data["new_cases"].mode()
+data_mode
+new_cases
+0	0
+
+dtype: int64
+Identify the mode of the continent column using the mode method
+
+data_mode = covid_data["continent"].mode()
+data_mode
+continent
+0	Europe
+
+dtype: object
+Check the variance of the new_cases column using the var method in numpy
+
+data_variance = np.var(covid_data["new_cases"])
+data_variance
+451321915.92810047
+Check the variance of the new_cases column using the var method in pandas
+
+covid_data["new_cases"].var()
+451399502.6422019
+Identify the standard deviation of a dataset using the std method in numpy
+
+data_sd = np.std(covid_data["new_cases"])
+data_sd
+21244.33844411495
+Identify the standard deviation of a dataset using the std method in pandas
+
+covid_data["new_cases"].std()
+21246.16442189512
+Generate the range of a dataset using numpy
+
+data_max = np.max(covid_data["new_cases"])
+data_min = np.min(covid_data["new_cases"])
+print(data_max,data_min)
+287149 0
+data_range = data_max - data_min
+data_range
+287149
+Generate the range of a dataset using pandas
+
+data_max = covid_data["new_cases"].max()
+data_min = covid_data["new_cases"].min()
+data_range = data_max - data_min
+data_range
+287149
+Identify the percentile of a dataset using numpy
+
+data_percentile = np.percentile(covid_data["new_cases"],60)
+data_percentile
+np.float64(591.3999999999996)
+Check the quartile of a dataset using numpy
+
+data_quartile = np.quantile(covid_data["new_cases"],0.75)
+data_quartile
+np.float64(3666.0)
+Analyse the interquartile range (IQR) of a dataset using the stats library
+
+data_IQR = stats.iqr(covid_data["new_cases"], interpolation = 'midpoint')
+data_IQR
+np.float64(3641.0)
+data_IQR = stats.iqr(covid_data["new_cases"])
+data_IQR
+np.float64(3642.0)
