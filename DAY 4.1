@@ -1,0 +1,215 @@
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import numpy as np
+
+# -------------------------------------------------
+# Check GPU
+# -------------------------------------------------
+print("TensorFlow Version:", tf.__version__)
+print("GPU:", tf.config.list_physical_devices('GPU'))
+
+# -------------------------------------------------
+# Dataset Path
+# -------------------------------------------------
+dataset_path = "rps"
+
+# -------------------------------------------------
+# Load Dataset
+# -------------------------------------------------
+train_dataset = tf.keras.preprocessing.image_dataset_from_directory(
+    dataset_path,
+    validation_split=0.2,
+    subset="training",
+    seed=123,
+    image_size=(150,150),
+    batch_size=32
+)
+
+validation_dataset = tf.keras.preprocessing.image_dataset_from_directory(
+    dataset_path,
+    validation_split=0.2,
+    subset="validation",
+    seed=123,
+    image_size=(150,150),
+    batch_size=32
+)
+
+class_names = train_dataset.class_names
+
+print(class_names)
+
+# -------------------------------------------------
+# Normalize Images
+# -------------------------------------------------
+normalization_layer = tf.keras.layers.Rescaling(1./255)
+
+train_dataset = train_dataset.map(lambda x, y: (normalization_layer(x), y))
+validation_dataset = validation_dataset.map(lambda x, y: (normalization_layer(x), y))
+
+# -------------------------------------------------
+# Build ANN Model
+# -------------------------------------------------
+model = tf.keras.Sequential([
+
+    tf.keras.layers.Flatten(input_shape=(150,150,3)),
+
+    tf.keras.layers.Dense(512, activation='relu'),
+
+    tf.keras.layers.Dense(256, activation='relu'),
+
+    tf.keras.layers.Dense(128, activation='relu'),
+
+    tf.keras.layers.Dense(3, activation='softmax')
+
+])
+
+# -------------------------------------------------
+# Compile Model
+# -------------------------------------------------
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# -------------------------------------------------
+# Train Model
+# -------------------------------------------------
+history = model.fit(
+    train_dataset,
+    validation_data=validation_dataset,
+    epochs=15
+)
+
+# -------------------------------------------------
+# Evaluate Model
+# -------------------------------------------------
+loss, accuracy = model.evaluate(validation_dataset)
+
+print("Validation Accuracy:", accuracy)
+
+# -------------------------------------------------
+# Plot Accuracy
+# -------------------------------------------------
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.legend(["Training","Validation"])
+
+plt.show()import zipfile
+
+zip_file = "rps.zip"          # Name of your ZIP file
+extract_to = "./rps"          # Folder to extract into
+
+with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+    zip_ref.extractall(extract_to)
+
+print("ZIP file extracted successfully!")import tensorflow as tf
+import matplotlib.pyplot as plt
+import numpy as np
+
+# ---------------------------------------------------
+# Check GPU
+# ---------------------------------------------------
+print("TensorFlow Version:", tf.__version__)
+
+gpus = tf.config.list_physical_devices('GPU')
+print("Available GPUs:", gpus)
+
+if gpus:
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
+# ---------------------------------------------------
+# Load Fashion MNIST Dataset
+# ---------------------------------------------------
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+
+print("Training Images :", x_train.shape)
+print("Testing Images  :", x_test.shape)
+
+# Normalize
+x_train = x_train.astype("float32") / 255.0
+x_test = x_test.astype("float32") / 255.0
+
+# ---------------------------------------------------
+# Class Names
+# ---------------------------------------------------
+class_names = [
+    'T-shirt',
+    'Trouser',
+    'Pullover',
+    'Dress',
+    'Coat',
+    'Sandal',
+    'Shirt',
+    'Sneaker',
+    'Bag',
+    'Ankle Boot'
+]
+
+# ---------------------------------------------------
+# Build ANN Model
+# ---------------------------------------------------
+model = tf.keras.Sequential([
+    tf.keras.layers.Flatten(input_shape=(28,28)),
+    tf.keras.layers.Dense(256, activation='relu'),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dense(10, activation='softmax')
+])
+
+# ---------------------------------------------------
+# Compile
+# ---------------------------------------------------
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# ---------------------------------------------------
+# Model Summary
+# ---------------------------------------------------
+model.summary()
+
+# ---------------------------------------------------
+# Train
+# ---------------------------------------------------
+history = model.fit(
+    x_train,
+    y_train,
+    epochs=10,
+    batch_size=128,
+    validation_split=0.2
+)
+
+# ---------------------------------------------------
+# Evaluate
+# ---------------------------------------------------
+loss, accuracy = model.evaluate(x_test, y_test)
+
+print("\nTest Accuracy:", accuracy)
+
+# ---------------------------------------------------
+# Predict One Image
+# ---------------------------------------------------
+prediction = model.predict(x_test[:1])
+
+predicted_label = np.argmax(prediction)
+
+print("Predicted :", class_names[predicted_label])
+print("Actual    :", class_names[y_test[0]])
+
+# ---------------------------------------------------
+# Display Image
+# ---------------------------------------------------
+plt.imshow(x_test[0], cmap='gray')
+plt.title(
+    f"Predicted: {class_names[predicted_label]}\n"
+    f"Actual: {class_names[y_test[0]]}"
+)
+plt.axis("off")
+plt.show()
