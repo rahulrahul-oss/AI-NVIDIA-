@@ -1,0 +1,92 @@
+from inference_sdk import InferenceHTTPClient
+from google.colab.patches import cv2_imshow
+import cv2
+
+# ---------------------------------
+# Roboflow Configuration
+# ---------------------------------
+API_KEY = "YOUR_NEW_ROBOFLOW_API_KEY"
+
+MODEL_ID = "vinayaks-workspace-pu/vin-r1isy-instant-1"
+
+CLIENT = InferenceHTTPClient(
+    api_url="https://serverless.roboflow.com",
+    api_key=API_KEY
+)
+
+# ---------------------------------
+# Image Path
+# ---------------------------------
+image_path = "/content/images (5).jpg"
+
+# ---------------------------------
+# Run Inference
+# ---------------------------------
+result = CLIENT.infer(
+    image_path,
+    model_id=MODEL_ID
+)
+
+print(result)
+
+# ---------------------------------
+# Read Image
+# -------------------------------…
+from google.colab import files
+import zipfile
+import os
+
+zip_path = "/content/dataset.zip"
+
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall('/content/dataset')
+
+os.remove(zip_path)
+
+print("File extracted and removed successfully.")
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+base_data_dir = "/content/dataset/flowers"
+data_dir = base_data_dir
+
+# Check if the directory actually exists
+if not os.path.isdir(data_dir):
+    found_data_dir = None
+    for root, dirs, files in os.walk(base_data_dir):
+        if dirs:
+            for subdir in dirs:
+                sub_path = os.path.join(root, subdir)
+                if os.path.isdir(sub_path):
+                    # Check if any image files are present in subdirectories to confirm it's a dataset root
+                    for _, _, subfiles in os.walk(sub_path):
+                        if any(f.lower().endswith(('.png', '.jpg', '.jpeg')) for f in subfiles):
+    …
+from tensorflow.keras.preprocessing import image
+import numpy as np
+import matplotlib.pyplot as plt
+
+img_path = "/test1.jpg"
+
+img = image.load_img(img_path, target_size=(128, 128))
+img_array = image.img_to_array(img)
+
+img_array = img_array / 255.0
+
+img_array = np.expand_dims(img_array, axis=0)
+
+predictions = model.predict(img_array)
+predicted_class_index = np.argmax(predictions[0])
+predicted_class_name = class_names[predicted_class_index]
+confidence = np.max(predictions[0])
+
+plt.imshow(img)
+plt.title(f"Prediction: {predicted_class_name} ({confidence:.2f})")
+plt.axis('off')
+plt.show()
+
+print("Predicted class:", predicted_class_name)
+print("Confidence:", confidence)
