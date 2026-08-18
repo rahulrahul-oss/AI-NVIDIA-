@@ -1,0 +1,222 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import matplotlib.pyplot as plt
+
+# -------------------------
+# Device
+# -------------------------
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using:", device)
+
+# -------------------------
+# Create simple dataset
+# -------------------------
+num_samples = 5000
+
+# Points around (2,2)
+data = torch.randn(num_samples, 2) * 0.5 + 2
+data = data.to(device)
+
+# -------------------------
+# Diffusion Parameters
+# -------------------------
+T = 100
+
+beta = torch.linspace(0.0001, 0.02, T).to(device)
+alpha = 1 - beta
+alpha_bar = torch.cumprod(alpha, dim=0)
+
+# -------------------------
+# Forward Diffusion
+# -------------------------
+def forward_diffusion(x0, t):
+    noise = torch.r…
+import torch
+from diffusers import StableDiffusionPipeline
+
+# Check GPU
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print("Using:", device)
+
+# Load Stable Diffusion model
+pipe = StableDiffusionPipeline.from_pretrained(
+    "runwayml/stable-diffusion-v1-5",
+    torch_dtype=torch.float16 if device == "cuda" else torch.float32
+)
+
+pipe = pipe.to(device)
+
+# Prompt
+prompt = "A cute brown puppy playing with a white kitten in a garden"
+
+# Generate image
+image = pipe(prompt).images[0]
+
+# Save image
+image.save("output.png")
+
+print("Image saved as output.png")
+import os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torchvision.utils import save_image
+from torch.utils.data import DataLoader
+
+# ---------------- Config ----------------
+DATASET_DIR = "Cat_Dataset"
+OUTPUT_DIR = "generated_images"
+MODEL_DIR = "models"
+
+IMAGE_SIZE = 64
+BATCH_SIZE = 64
+LATENT_DIM = 100
+CHANNELS = 3
+FEATURES_G = 64
+FEATURES_D = 64
+EPOCHS = 50
+LR = 2e-4
+BETA1 = 0.5
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+transform = transforms.Compose([
+    transforms.Resize(IMAGE_SIZE),
+    transforms.CenterCrop(IMAGE_SIZE),
+    transforms.ToTensor(),
+transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))
+])
+
+dataset = datasets.ImageFolder(DATASET_DIR, transform=transform)
+loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True,
+                    num_workers=2, pin_memory=torch.cuda.is_available())
+
+def weights_init(m):
+    name = m._class.name_
+    if "Conv" in name:
+        nn.init.normal_(m.weight.data,0.0,0.02)
+    elif "BatchNorm" in name:
+        nn.init.normal_(m.weight.data,1.0,0.02)
+        nn.init.constant_(m.bias.data,0)
+
+class Generator(nn.Module):
+    def _init_(self):
+        super()._init_()
+        self.net = nn.Sequential(
+            nn.ConvTranspose2d(LATENT_DIM, FEATURES_G*8,4,1,0,bias=False),
+            nn.BatchNorm2d(FEATURES_G*8),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(FEATURES_G*8, FEATURES_G*4,4,2,1,bias=False),
+            nn.BatchNorm2d(FEATURES_G*4),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(FEATURES_G*4, FEATURES_G*2,4,2,1,bias=False),
+            nn.BatchNorm2d(FEATURES_G*2),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(FEATURES_G*2, FEATURES_G,4,2,1,bias=False),
+            nn.BatchNorm2d(FEATURES_G),
+            nn.ReLU(True),
+
+            nn.ConvTranspose2d(FEATURES_G, CHANNELS,4,2,1,bias=False),
+            nn.Tanh()
+        )
+    def forward(self,x):
+        return self.net(x)
+
+class Discriminator(nn.Module):
+    def _init_(self):
+        super()._init_()
+        self.net = nn.Sequential(
+            nn.Conv2d(CHANNELS, FEATURES_D,4,2,1,bias=False),
+            nn.LeakyReLU(0.2,True),
+
+            nn.Conv2d(FEATURES_D, FEATURES_D*2,4,2,1,bias=False),
+            nn.BatchNorm2d(FEATURES_D*2),
+            nn.LeakyReLU(0.2,True),
+
+            nn.Conv2d(FEATURES_D*2, FEATURES_D*4,4,2,1,bias=False),
+            nn.BatchNorm2d(FEATURES_D*4),
+            nn.LeakyReLU(0.2,True),
+
+            nn.Conv2d(FEATURES_D*4, FEATURES_D*8,4,2,1,bias=False),
+            nn.BatchNorm2d(FEATURES_D*8),
+            nn.LeakyReLU(0.2,True),
+
+            nn.Conv2d(FEATURES_D*8,1,4,1,0,bias=False),
+            nn.Sigmoid()
+        )
+    def forward(self,x):
+        return self.net(x).view(-1)
+
+G = Generator().to(device)
+D = Discriminator().to(device)
+G.apply(weights_init)
+D.apply(weights_init)
+
+criterion = nn.BCELoss()
+optG = optim.Adam(G.parameters(), lr=LR, betas=(BETA1,0.999))
+optD = optim.Adam(D.parameters(), lr=LR, betas=(BETA1,0.999))
+
+fixed_noise = torch.randn(64, LATENT_DIM,1,1, device=device)
+
+print("Training...")
+
+for epoch in range(EPOCHS):
+    for i,(real,_) in enumerate(loader):
+        real = real.to(device)
+        b = real.size(0)
+
+        # Train D
+        D.zero_grad()
+        real_label = torch.ones(b, device=device)
+        fake_label = torch.zeros(b, device=device)
+
+        out_real = D(real)
+        loss_real = criterion(out_real, real_label)
+
+        noise = torch.randn(b, LATENT_DIM,1,1, device=device)
+        fake = G(noise)
+        out_fake = D(fake.detach())
+        loss_fake = criterion(out_fake, fake_label)
+
+        lossD = loss_real + loss_fake
+        lossD.backward()
+optD.step()
+
+        # Train G
+        G.zero_grad()
+        out = D(fake)
+        lossG = criterion(out, real_label)
+        lossG.backward()
+        optG.step()
+
+        if i % 50 == 0:
+            print(f"Epoch {epoch+1}/{EPOCHS} Batch {i}/{len(loader)} "
+                  f"D:{lossD.item():.4f} G:{lossG.item():.4f}")
+
+    with torch.no_grad():
+        samples = G(fixed_noise).detach().cpu()
+        save_image(samples,
+                   os.path.join(OUTPUT_DIR,f"epoch_{epoch+1:03d}.png"),
+                   normalize=True,nrow=8)
+
+torch.save(G.state_dict(), os.path.join(MODEL_DIR,"generator.pth"))
+torch.save(D.state_dict(), os.path.join(MODEL_DIR,"discriminator.pth"))
+
+print("Training completed.")
+
+# Generate final samples
+with torch.no_grad():
+    z = torch.randn(16, LATENT_DIM,1,1, device=device)
+    imgs = G(z).cpu()
+    save_image(imgs, os.path.join(OUTPUT_DIR,"final_samples.png"),
+               normalize=True,nrow=4)
+print("Saved generated images.")
