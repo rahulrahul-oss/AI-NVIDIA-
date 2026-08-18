@@ -1,0 +1,540 @@
+
+
+from google import genai
+
+client = genai.Client(
+    api_key="your api"
+)
+
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="Explain what Artificial Intelligence is in simple words."
+)
+
+print(response.text)
+from google import genai
+from PIL import Image
+
+# Initialize Gemini Client
+client = genai.Client(api_key="your api")
+
+# Load medical report image
+image = Image.open("image path")
+
+prompt = """
+You are an AI medical report assistant.
+
+Analyze this medical report.
+
+Return the following sections:
+
+1. Patient Information
+   - Name
+   - Age
+   - Gender
+   - Date
+
+2. Test Results
+   Display as a table with:
+   - Test Name
+   - Result
+   - Reference Range (if available)
+   - Status (Within Range / Outside Range / Not Available)
+
+3. Highlight values that appear outside the provided reference range.
+
+4. Explain each test in simple language suitable for a non-medical person.
+
+5. Provide a concise summary of the report.
+
+6. Suggest general questions the patient could ask their healthcare provider.
+
+Do NOT diagnose medical conditions.
+Do NOT prescribe medications.
+If information is missing, clearly state that.
+"""
+
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=[prompt, image]
+)
+
+print(response.text)
+import os
+import pandas as pd
+import torch
+from sentence_transformers import SentenceTransformer
+from google import genai
+import faiss
+
+# ---------------------------------------
+# GPU Detection
+# ---------------------------------------
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+print("Using Device:", device)
+
+if device == "cuda":
+    print("GPU:", torch.cuda.get_device_name(0))
+
+# ---------------------------------------
+# Load Dataset
+# ---------------------------------------
+CSV_FILE = "/content/medical_reports.csv"
+
+df = pd.read_csv(CSV_FILE)
+
+print(df.head())
+
+# ---------------------------------------
+# Convert CSV into Documents
+# One document per patient
+# ---------------------------------------
+documents = []
+
+for patient_id, group in df.groupby("Patient_ID"):
+
+    report = f"""
+Patient ID : {patient_id}
+
+Name : {group.iloc[0]['Name']}
+Age : {group.iloc[0]['Age']}
+Gender : {group.iloc[0]['Gender']}
+
+Medical Report
+--------------
+"""
+
+    for _, row in group.iterrows():
+
+        report += f"""
+Test Name : {row['Test_Name']}
+Result : {row['Result']} {row['Unit']}
+Reference Range : {row['Reference_Range']}
+Status : {row['Status']}
+"""
+
+    documents.append(report)
+
+print("\nSample Document\n")
+print(documents[0])
+
+# ---------------------------------------
+# Load Embedding Model
+# ---------------------------------------
+print("\nLoading Embedding Model...")
+
+embedder = SentenceTransformer(
+    "BAAI/bge-small-en-v1.5",
+    device=device
+)
+
+# ---------------------------------------
+# Generate Embeddings
+# ---------------------------------------
+print("Generating Embeddings...")
+
+embeddings = embedder.encode(
+    documents,
+    batch_size=16,
+    convert_to_numpy=True,
+    show_progress_bar=True
+)
+
+print("Embedding Shape:", embeddings.shape)
+
+# ---------------------------------------
+# Build FAISS Index
+# ---------------------------------------
+dimension = embeddings.shape[1]
+
+index = faiss.IndexFlatL2(dimension)
+
+index.add(embeddings)
+
+print("Documents Indexed:", index.ntotal)
+
+# ---------------------------------------
+# Gemini API
+# ---------------------------------------
+
+# Option 1: Direct API key (recommended for testing)
+API_KEY = "AQ.Ab8RN6J7SFy_-OnMGp9g3wBGDQagsG1mm2Uv2xak8IfJ280rfw"
+
+client = genai.Client(api_key=API_KEY)
+
+# ---------------------------------------
+# Ask Gemini
+# ---------------------------------------
+
+def ask_gemini(question, top_k=2):
+
+    q_embedding = embedder.encode(
+        [question],
+        convert_to_numpy=True
+    )
+
+    distances, indices = index.search(q_embedding, top_k)
+
+    context = "\n\n".join(
+        documents[i] for i in indices[0]
+    )
+
+    prompt = f"""
+You are an experienced medical report assistant.
+
+Below is the retrieved patient report.
+
+{context}
+
+Answer ONLY from the report.
+
+If the information is unavailable,
+say:
+
+"The requested information is not available in this report."
+
+Never diagnose diseases.
+
+Never prescribe medicine.
+
+Explain medical terms in simple language.
+
+Question:
+{question}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
+
+    return response.text
+
+# ---------------------------------------
+# Chat Loop
+# ---------------------------------------
+print("\n" + "="*60)
+print("Medical Report Assistant")
+print("="*60)
+
+while True:
+
+    question = input("\nAsk Question (type exit): ")
+
+    if question.lower() == "exit":
+        break
+
+    answer = ask_gemini(question)
+
+    print("\nGemini Answer:\n")
+    print(answer)
+"""
+llama_finetune.py
+LoRA fine-tuning of TinyLlama on Dolly-15k using GPU.
+"""
+
+import torch
+from datasets import load_dataset
+from transformers import (AutoTokenizer, AutoModelForCausalLM,
+                          BitsAndBytesConfig)
+from peft import LoraConfig
+from trl import SFTTrainer, SFTConfig
+
+MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+OUTPUT_DIR = "./tinyllama_lora"
+MAX_SEQ_LEN = 512
+
+print("="*60)
+print("CUDA Available :", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("GPU :", torch.cuda.get_device_name(0))
+print("="*60)
+
+bnb = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,
+)
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+tokenizer.pad_token = tokenizer.eos_token
+
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    device_map="auto",
+    quantization_config=bnb,
+    torch_dtype=torch.bfloat16,
+)
+
+model.config.use_cache = False
+
+dataset = load_dataset("databricks/databricks-dolly-15k",
+                       split="train[:1000]")
+
+def formatting_func(example):
+    inst = example["instruction"]
+    ctx = example["context"]
+    ans = example["response"]
+    if ctx.strip():
+        return f"""### Instruction:
+{inst}
+
+### Input:
+{ctx}
+
+### Response:
+{ans}
+"""
+    return f"""### Instruction:
+{inst}
+
+### Response:
+{ans}
+"""
+
+peft_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM",
+    target_modules=["q_proj","k_proj","v_proj","o_proj"],
+)
+
+args = SFTConfig(
+    output_dir=OUTPUT_DIR,
+    per_device_train_batch_size=2,
+    gradient_accumulation_steps=4,
+    learning_rate=2e-4,
+    num_train_epochs=1,
+    logging_steps=10,
+    save_steps=200,
+    fp16=False,
+    bf16=True,
+    report_to="none",
+    optim="paged_adamw_8bit",
+    max_length=MAX_SEQ_LEN,
+    packing=False,
+)
+
+trainer = SFTTrainer(
+    model=model,
+    processing_class=tokenizer,
+    train_dataset=dataset,
+    formatting_func=formatting_func,
+    peft_config=peft_config,
+    args=args,
+)
+
+print("Starting training...")
+trainer.train()
+
+trainer.save_model(OUTPUT_DIR)
+tokenizer.save_pretrained(OUTPUT_DIR)
+
+print("Training complete.")
+
+print("\nInteractive inference (Ctrl+C to quit)")
+while True:
+    q = input("\nYou: ")
+    prompt = f"### Instruction:\n{q}\n\n### Response:\n"
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    out = model.generate(**inputs, max_new_tokens=200,
+                         do_sample=True, temperature=0.7)
+    print(tokenizer.decode(out[0], skip_special_tokens=True))
+import cv2
+import matplotlib.pyplot as plt
+
+img1 = cv2.imread('IMAGE PATH1', 0)
+img2 = cv2.imread('IMAGE PATH2', 0)
+
+orb = cv2.ORB_create()
+
+kp1, des1 = orb.detectAndCompute(img1, None)
+kp2, des2 = orb.detectAndCompute(img2, None)
+
+bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+matches = bf.match(des1, des2)
+matches = sorted(matches, key=lambda x: x.distance)
+
+result = cv2.drawMatches(img1, kp1, img2, kp2, matches[:20], None, matchesThickness=5)
+
+plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+plt.title("Feature Matches")
+plt.axis('off')
+plt.show()
+# -----------------------------------------------
+# Mini Chatbot using Python
+# Rule-Based Chatbot using Tokenization
+# -----------------------------------------------
+
+import nltk
+from nltk.tokenize import word_tokenize
+import random
+
+# Download tokenizer
+#punkt is a pre-trained unsupervised machine learning sentence tokenizer provided 
+#by the NLTK library. Unlike simple string splitting, it is trained to look at punctuation, 
+#abbreviations,and context to determine where sentences and words actually begin and end
+nltk.download('punkt')
+nltk.download('punkt_tab')
+
+print("="*60)
+print(" MINI CHATBOT USING PYTHON")
+print("="*60)
+
+print("Type 'exit' to stop the chatbot.\n")
+
+# Knowledge Base
+responses = {
+
+    "hello":[
+        "Hello! How can I help you?",
+        "Hi! Nice to meet you.",
+        "Greetings!"
+    ],
+
+    "hi":[
+        "Hello!",
+        "Hi there!",
+        "Welcome!"
+    ],
+
+    "python":[
+        "Python is a high-level programming language.",
+        "Python is widely used in AI and Machine Learning."
+    ],
+
+    "ai":[
+        "Artificial Intelligence enables machines to learn and make decisions.",
+        "AI is one of today's fastest-growing technologies."
+    ],
+
+    "machine":[
+        "Machine Learning is a subset of AI.",
+        "ML allows computers to learn from data."
+    ],
+
+    "weather":[
+        "I cannot access live weather information.",
+        "Please check an online weather service."
+    ],
+
+    "name":[
+        "I am a Mini Chatbot developed in Python."
+    ],
+
+    "bye":[
+        "Goodbye!",
+        "Have a great day!",
+        "See you again!"
+    ]
+}
+
+# Chat Loop
+while True:
+
+    user = input("\nYou : ").lower()
+
+    if user == "exit":
+        print("Bot : Goodbye!")
+        break
+
+    # Tokenization
+    tokens = word_tokenize(user)
+
+    found = False
+
+    # Keyword Matching
+    for word in tokens:
+
+        if word in responses:
+            print("Bot :", random.choice(responses[word]))
+            found = True
+            break
+
+    if not found:
+        print("Bot : Sorry, I don't understand. Please ask another question.")
+# ZERO-SHOT PROMPTING
+
+def mock_llm(prompt):
+    # Simulated response
+    return f"[LLM Response] {prompt}"
+
+# Zero-shot prompt
+prompt = "Explain Artificial Intelligence in simple terms."
+
+response = mock_llm(prompt)
+
+print("Prompt:\n", prompt)
+print("\nResponse:\n", response)
+# FEW-SHOT PROMPTING
+
+def mock_llm(prompt):
+    return f"[LLM Response based on examples]\n{prompt}"
+
+# Few-shot prompt with examples
+prompt = """
+Translate English to French:
+
+English: Hello
+French: Bonjour
+
+English: Thank you
+French: Merci
+
+English: Good morning
+French:
+"""
+
+response = mock_llm(prompt)
+
+print("Prompt:\n", prompt)
+print("\nResponse:\n", response)
+# CHAIN-OF-THOUGHT PROMPTING
+
+def mock_llm(prompt):
+    return f"[Step-by-step reasoning]\n{prompt}"
+
+prompt = """
+Q: If a train travels 60 km in 1 hour, how far will it travel in 5 hours?
+
+Let's think step by step.
+"""
+
+response = mock_llm(prompt)
+
+print("Prompt:\n", prompt)
+print("\nResponse:\n", response)
+# COMPARE DIFFERENT PROMPTS
+
+def mock_llm(prompt):
+    return f"[Response]\n{prompt}\n"
+
+zero_shot = "Summarize: Artificial Intelligence is transforming industries."
+
+few_shot = """
+Summarize the following:
+
+Text: AI is used in healthcare.
+Summary: AI helps doctors.
+
+Text: Artificial Intelligence is transforming industries.
+Summary:
+"""
+
+cot = """
+Summarize the text step by step:
+
+1. Identify key idea
+2. Remove extra details
+3. Form short summary
+
+Text: Artificial Intelligence is transforming industries.
+"""
+
+print("ZERO SHOT:\n", mock_llm(zero_shot))
+print("FEW SHOT:\n", mock_llm(few_shot))
+print("CHAIN OF THOUGHT:\n", mock_llm(cot))
