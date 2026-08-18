@@ -1,0 +1,41 @@
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+
+# Download required resources
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('stopwords')
+nltk.download('wordnet')
+
+text = "The students are studying Artificial Intelligence in the university."
+
+print("Original Sentence:")
+print(text)
+
+# Tokenization
+tokens = word_tokenize(text)
+print("\nTokens:")
+print(tokens)
+
+# Stopword Removal
+stop_words = set(stopwords.words('english'))
+filtered_words = [word for word in tokens if word.lower() not in stop_words]
+
+print("\nAfter Stopword Removal:")
+print(filtered_words)
+
+# Stemming
+stemmer = PorterStemmer()
+stemmed = [stemmer.stem(word) for word in filtered_words]
+
+print("\nStemmed Words:")
+print(stemmed)
+
+# Lemmatization
+lemmatizer = WordNetLemmatizer()
+lemmatized = [lemmatizer.lemmatize(word) for word in filtered_words]
+
+print("\nLemmatized Words:")
+print(lemmatized)
